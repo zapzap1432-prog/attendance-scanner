@@ -1,18 +1,197 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Attendance Scanner</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Get Entry Pass</title>
+  <!-- bwip-js client library for native barcode rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/bwip-js@3.0.4/dist/bwip-js-min.js"></script>
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-    iframe { width: 100%; height: 100%; border: none; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      background: #ffffff;
+      color: #000000;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 340px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.022em;
+      margin-bottom: 6px;
+    }
+
+    p {
+      font-size: 13px;
+      color: #8e8e93;
+      line-height: 1.38;
+      margin-bottom: 32px;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    input[type="email"] {
+      width: 100%;
+      padding: 16px;
+      border: 1px solid #e5e5ea;
+      border-radius: 14px;
+      font-size: 15px;
+      outline: none;
+      background: #f2f2f7;
+      color: #000000;
+      transition: border-color 0.2s ease;
+    }
+
+    input[type="email"]:focus {
+      border-color: #000000;
+      background: #ffffff;
+    }
+
+    .btn-submit {
+      width: 100%;
+      background: #000000;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+
+    .btn-submit:active {
+      opacity: 0.8;
+    }
+
+    #pass-container {
+      display: none;
+      margin-top: 24px;
+      padding: 28px 20px;
+      border: 1px solid #e5e5ea;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    }
+
+    canvas {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .id-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1c1c1e;
+      letter-spacing: 2px;
+      margin-top: 12px;
+    }
+
+    #error-msg {
+      color: #ff3b30;
+      font-size: 13px;
+      font-weight: 500;
+      margin-top: 16px;
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <iframe 
-    src="https://script.google.com/macros/s/AKfycbx8QgBGBW_EtkW0Ja30qbtXuovRDmiZkvWaADbaQ_XTKjZ7YLeQmApbkZHQOuYf5bl_/exec" 
-    allow="camera; microphone" 
-    allowfullscreen>
-  </iframe>
+
+  <div class="card">
+    <div id="search-container">
+      <h1>Get Entry Pass</h1>
+      <p>Enter the email address used during registration to view your ticket barcode.</p>
+
+      <div class="input-group">
+        <input type="email" id="email-input" placeholder="email@example.com" required>
+      </div>
+      
+      <button class="btn-submit" onclick="fetchPass()">View Barcode Pass</button>
+      <div id="error-msg"></div>
+    </div>
+
+    <!-- Generated Barcode Pass Container -->
+    <div id="pass-container">
+      <h1>Entry Ticket</h1>
+      <p>Screenshot this pass for event entry</p>
+      
+      <canvas id="barcode-canvas"></canvas>
+      <div class="id-label" id="id-display"></div>
+    </div>
+  </div>
+
+  <script>
+    // Replace with your Google Apps Script Web App Deployment URL
+    const API_URL = "YOUR_APPS_SCRIPT_EXEC_URL";
+
+    async function fetchPass() {
+      const email = document.getElementById('email-input').value.trim();
+      const errorDiv = document.getElementById('error-msg');
+      
+      if (!email) {
+        showError("Please enter a valid email address.");
+        return;
+      }
+
+      errorDiv.style.display = "none";
+
+      try {
+        const response = await fetch(`${API_URL}?email=${encodeURIComponent(email)}`);
+        const data = await response.json();
+
+        if (data.success) {
+          renderBarcode(data.id);
+        } else {
+          showError(data.message || "Registration not found.");
+        }
+      } catch (err) {
+        showError("Unable to retrieve pass. Check your connection.");
+      }
+    }
+
+    function renderBarcode(id) {
+      document.getElementById('search-container').style.display = "none";
+      document.getElementById('pass-container').style.display = "block";
+      document.getElementById('id-display').innerText = id;
+
+      try {
+        bwipjs.toCanvas('barcode-canvas', {
+          bcid: 'code128',       // Barcode type
+          text: id,              // Text to encode
+          scale: 3,              // Scaling factor
+          height: 12,            // Bar height, in millimeters
+          includetext: false     // Text shown in container below
+        });
+      } catch (e) {
+        console.error("Barcode generation error:", e);
+      }
+    }
+
+    function showError(msg) {
+      const errorDiv = document.getElementById('error-msg');
+      errorDiv.innerText = msg;
+      errorDiv.style.display = "block";
+    }
+  </script>
 </body>
 </html>
