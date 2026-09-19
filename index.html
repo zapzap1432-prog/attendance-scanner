@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Get Entry Pass</title>
-  <!-- bwip-js client library for native barcode rendering -->
   <script src="https://cdn.jsdelivr.net/npm/bwip-js@3.0.4/dist/bwip-js-min.js"></script>
   <style>
     * {
@@ -15,7 +14,7 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
       background: #ffffff;
       color: #000000;
       min-height: 100vh;
@@ -50,19 +49,21 @@
       margin-bottom: 16px;
     }
 
-    input[type="email"] {
+    input[type="text"] {
       width: 100%;
       padding: 16px;
       border: 1px solid #e5e5ea;
       border-radius: 14px;
-      font-size: 15px;
+      font-size: 16px;
       outline: none;
       background: #f2f2f7;
       color: #000000;
+      text-align: center;
+      letter-spacing: 1px;
       transition: border-color 0.2s ease;
     }
 
-    input[type="email"]:focus {
+    input[type="text"]:focus {
       border-color: #000000;
       background: #ffffff;
     }
@@ -86,7 +87,7 @@
 
     #pass-container {
       display: none;
-      margin-top: 24px;
+      margin-top: 12px;
       padding: 28px 20px;
       border: 1px solid #e5e5ea;
       border-radius: 20px;
@@ -96,11 +97,12 @@
     canvas {
       max-width: 100%;
       height: auto;
+      margin-top: 16px;
     }
 
     .id-label {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 14px;
+      font-weight: 700;
       color: #1c1c1e;
       letter-spacing: 2px;
       margin-top: 12px;
@@ -120,20 +122,20 @@
   <div class="card">
     <div id="search-container">
       <h1>Get Entry Pass</h1>
-      <p>Enter the email address used during registration to view your ticket barcode.</p>
+      <p>Enter your Barcode / ID number below to generate your event ticket.</p>
 
       <div class="input-group">
-        <input type="email" id="email-input" placeholder="email@example.com" required>
+        <input type="text" id="id-input" placeholder="Enter Registration ID" required autocomplete="off">
       </div>
       
       <button class="btn-submit" onclick="fetchPass()">View Barcode Pass</button>
       <div id="error-msg"></div>
     </div>
 
-    <!-- Generated Barcode Pass Container -->
+    <!-- Generated Pass Output -->
     <div id="pass-container">
-      <h1>Entry Ticket</h1>
-      <p>Screenshot this pass for event entry</p>
+      <h1>Event Pass</h1>
+      <p>Screenshot this ticket for check-in</p>
       
       <canvas id="barcode-canvas"></canvas>
       <div class="id-label" id="id-display"></div>
@@ -142,27 +144,31 @@
 
   <script>
     // Replace with your Google Apps Script Web App Deployment URL
-    const API_URL = "https://script.google.com/macros/s/AKfycbx8QgBGBW_EtkW0Ja30qbtXuovRDmiZkvWaADbaQ_XTKjZ7YLeQmApbkZHQOuYf5bl_/exec";
+    const API_URL = "YOUR_APPS_SCRIPT_EXEC_URL";
 
     async function fetchPass() {
-      const email = document.getElementById('email-input').value.trim();
+      const id = document.getElementById('id-input').value.trim();
       const errorDiv = document.getElementById('error-msg');
       
-      if (!email) {
-        showError("Please enter a valid email address.");
+      if (!id) {
+        showError("Please enter your Registration ID.");
         return;
       }
 
       errorDiv.style.display = "none";
 
       try {
-        const response = await fetch(`${API_URL}?email=${encodeURIComponent(email)}`);
+        const response = await fetch(`${API_URL}?id=${encodeURIComponent(id)}`, {
+          method: "GET",
+          redirect: "follow"
+        });
+
         const data = await response.json();
 
         if (data.success) {
           renderBarcode(data.id);
         } else {
-          showError(data.message || "Registration not found.");
+          showError(data.message || "Registration ID not found.");
         }
       } catch (err) {
         showError("Unable to retrieve pass. Check your connection.");
@@ -176,14 +182,14 @@
 
       try {
         bwipjs.toCanvas('barcode-canvas', {
-          bcid: 'code128',       // Barcode type
-          text: id,              // Text to encode
-          scale: 3,              // Scaling factor
-          height: 12,            // Bar height, in millimeters
-          includetext: false     // Text shown in container below
+          bcid: 'code128',
+          text: id,
+          scale: 3,
+          height: 12,
+          includetext: false
         });
       } catch (e) {
-        console.error("Barcode generation error:", e);
+        console.error("Barcode Generation Error:", e);
       }
     }
 
