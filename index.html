@@ -142,62 +142,74 @@
     </div>
   </div>
 
-  <script>
-    // Replace with your Google Apps Script Web App Deployment URL
-    const API_URL = "https://script.google.com/macros/s/AKfycbx8QgBGBW_EtkW0Ja30qbtXuovRDmiZkvWaADbaQ_XTKjZ7YLeQmApbkZHQOuYf5bl_/exec";
+ <script>
+  // Your Google Apps Script Exec URL
+  const API_URL = "https://script.google.com/macros/s/AKfycbx8QgBGBW_EtkW0Ja30qbtXuovRDmiZkvWaADbaQ_XTKjZ7YLeQmApbkZHQOuYf5bl_/exec";
 
-    async function fetchPass() {
-      const id = document.getElementById('id-input').value.trim();
-      const errorDiv = document.getElementById('error-msg');
-      
-      if (!id) {
-        showError("Please enter your Registration ID.");
-        return;
-      }
-
-      errorDiv.style.display = "none";
-
-      try {
-        const response = await fetch(`${API_URL}?id=${encodeURIComponent(id)}`, {
-          method: "GET",
-          redirect: "follow"
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          renderBarcode(data.id);
-        } else {
-          showError(data.message || "Registration ID not found.");
-        }
-      } catch (err) {
-        showError("Unable to retrieve pass. Check your connection.");
-      }
+  function fetchPass() {
+    const idInput = document.getElementById('id-input').value.trim();
+    const errorDiv = document.getElementById('error-msg');
+    
+    if (!idInput) {
+      showError("Please enter your Registration ID.");
+      return;
     }
 
-    function renderBarcode(id) {
-      document.getElementById('search-container').style.display = "none";
-      document.getElementById('pass-container').style.display = "block";
-      document.getElementById('id-display').innerText = id;
+    errorDiv.style.display = "none";
 
-      try {
-        bwipjs.toCanvas('barcode-canvas', {
-          bcid: 'code128',
-          text: id,
-          scale: 3,
-          height: 12,
-          includetext: false
-        });
-      } catch (e) {
-        console.error("Barcode Generation Error:", e);
+    // Create a unique JSONP callback function name
+    const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
+    
+    // Define the callback globally so Google Apps Script can execute it
+    window[callbackName] = function(data) {
+      // Clean up script tag and callback after execution
+      delete window[callbackName];
+      const scriptTag = document.getElementById(callbackName);
+      if (scriptTag) scriptTag.remove();
+
+      if (data && data.success) {
+        renderBarcode(data.id);
+      } else {
+        showError((data && data.message) ? data.message : "Registration ID not found.");
       }
-    }
+    };
 
-    function showError(msg) {
-      const errorDiv = document.getElementById('error-msg');
-      errorDiv.innerText = msg;
-      errorDiv.style.display = "block";
+    // Inject <script> tag to perform the request via JSONP
+    const script = document.createElement('script');
+    script.id = callbackName;
+    script.src = `${API_URL}?id=${encodeURIComponent(idInput)}&callback=${callbackName}`;
+    script.onerror = function() {
+      showError("Unable to retrieve pass. Please verify deployment access permissions.");
+      delete window[callbackName];
+      script.remove();
+    };
+
+    document.body.appendChild(script);
+  }
+
+  function renderBarcode(id) {
+    document.getElementById('search-container').style.display = "none";
+    document.getElementById('pass-container').style.display = "block";
+    document.getElementById('id-display').innerText = id;
+
+    try {
+      bwipjs.toCanvas('barcode-canvas', {
+        bcid: 'code128',
+        text: id,
+        scale: 3,
+        height: 12,
+        includetext: false
+      });
+    } catch (e) {
+      console.error("Barcode Generation Error:", e);
     }
-  </script>
+  }
+
+  function showError(msg) {
+    const errorDiv = document.getElementById('error-msg');
+    errorDiv.innerText = msg;
+    errorDiv.style.display = "block";
+  }
+</script>
 </body>
 </html>
