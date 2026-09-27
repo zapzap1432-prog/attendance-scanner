@@ -167,21 +167,21 @@
 
     isFetching = true;
     submitBtn.disabled = true;
+    submitBtn.innerText = "Verifying...";
     errorDiv.style.display = "none";
 
-    // 1. Instantly render barcode locally for zero visible delay
-    renderBarcode(idInput);
-
-    // 2. Perform background verification via JSONP
+    // Create unique JSONP callback
     const callbackName = 'jsonp_cb_' + Math.floor(Math.random() * 1000000);
     
     window[callbackName] = function(data) {
       cleanup(callbackName);
-      if (!data || !data.success) {
-        // Revert view if ID validation fails on server
-        document.getElementById('pass-container').style.display = "none";
-        document.getElementById('search-container').style.display = "block";
-        showError((data && data.message) ? data.message : "Registration ID not found.");
+
+      // VERIFY FIRST: Only generate barcode IF registration ID exists in backend
+      if (data && data.success) {
+        renderBarcode(data.id || idInput);
+      } else {
+        // ID not found or error returned from server
+        showError((data && data.message) ? data.message : "ID not found.");
       }
     };
 
@@ -190,9 +190,7 @@
     script.src = `${API_URL}?id=${encodeURIComponent(idInput)}&callback=${callbackName}`;
     script.onerror = function() {
       cleanup(callbackName);
-      document.getElementById('pass-container').style.display = "none";
-      document.getElementById('search-container').style.display = "block";
-      showError("Unable to retrieve pass. Please verify deployment access permissions.");
+      showError("Unable to retrieve pass. Please check your connection or access permissions.");
     };
 
     document.body.appendChild(script);
@@ -200,16 +198,24 @@
 
   function cleanup(callbackName) {
     isFetching = false;
-    document.getElementById('submit-btn').disabled = false;
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = false;
+    submitBtn.innerText = "View Barcode Pass";
     delete window[callbackName];
     const scriptTag = document.getElementById(callbackName);
     if (scriptTag) scriptTag.remove();
   }
 
   function renderBarcode(id) {
+    // Hide search form and display pass card
     document.getElementById('search-container').style.display = "none";
     document.getElementById('pass-container').style.display = "block";
     document.getElementById('id-display').innerText = id;
+
+    // Clear any existing barcode canvas content
+    const canvas = document.getElementById('barcode-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     try {
       bwipjs.toCanvas('barcode-canvas', {
@@ -221,6 +227,7 @@
       });
     } catch (e) {
       console.error("Barcode Generation Error:", e);
+      showError("Error rendering barcode image.");
     }
   }
 
