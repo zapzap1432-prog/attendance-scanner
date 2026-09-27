@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Get Entry Pass</title>
+  <!-- Preload bwip-js script for faster rendering -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/bwip-js@3.0.4/dist/bwip-js-min.js" as="script">
   <script src="https://cdn.jsdelivr.net/npm/bwip-js@3.0.4/dist/bwip-js-min.js"></script>
   <style>
     * {
@@ -85,6 +87,11 @@
       opacity: 0.8;
     }
 
+    .btn-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     #pass-container {
       display: none;
       margin-top: 12px;
@@ -128,7 +135,7 @@
         <input type="text" id="id-input" placeholder="Enter Registration ID" required autocomplete="off">
       </div>
       
-      <button class="btn-submit" onclick="fetchPass()">View Barcode Pass</button>
+      <button class="btn-submit" id="submit-btn" onclick="fetchPass()">View Barcode Pass</button>
       <div id="error-msg"></div>
     </div>
 
@@ -142,49 +149,61 @@
     </div>
   </div>
 
- <script>
-  // Your Google Apps Script Exec URL
+  <script>
   const API_URL = "https://script.google.com/macros/s/AKfycbyp4x8qFVESoo4CmRo2QdV4iLCP4QlUwV6NIUInIlrTojeXc3sppuODzxj6jZeUGSsHsg/exec";
+  let isFetching = false;
 
   function fetchPass() {
+    if (isFetching) return;
+
     const idInput = document.getElementById('id-input').value.trim();
     const errorDiv = document.getElementById('error-msg');
-    
+    const submitBtn = document.getElementById('submit-btn');
+
     if (!idInput) {
       showError("Please enter your Registration ID.");
       return;
     }
 
+    isFetching = true;
+    submitBtn.disabled = true;
     errorDiv.style.display = "none";
 
-    // Create a unique JSONP callback function name
-    const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
-    
-    // Define the callback globally so Google Apps Script can execute it
-    window[callbackName] = function(data) {
-      // Clean up script tag and callback after execution
-      delete window[callbackName];
-      const scriptTag = document.getElementById(callbackName);
-      if (scriptTag) scriptTag.remove();
+    // 1. Instantly render barcode locally for zero visible delay
+    renderBarcode(idInput);
 
-      if (data && data.success) {
-        renderBarcode(data.id);
-      } else {
+    // 2. Perform background verification via JSONP
+    const callbackName = 'jsonp_cb_' + Math.floor(Math.random() * 1000000);
+    
+    window[callbackName] = function(data) {
+      cleanup(callbackName);
+      if (!data || !data.success) {
+        // Revert view if ID validation fails on server
+        document.getElementById('pass-container').style.display = "none";
+        document.getElementById('search-container').style.display = "block";
         showError((data && data.message) ? data.message : "Registration ID not found.");
       }
     };
 
-    // Inject <script> tag to perform the request via JSONP
     const script = document.createElement('script');
     script.id = callbackName;
     script.src = `${API_URL}?id=${encodeURIComponent(idInput)}&callback=${callbackName}`;
     script.onerror = function() {
+      cleanup(callbackName);
+      document.getElementById('pass-container').style.display = "none";
+      document.getElementById('search-container').style.display = "block";
       showError("Unable to retrieve pass. Please verify deployment access permissions.");
-      delete window[callbackName];
-      script.remove();
     };
 
     document.body.appendChild(script);
+  }
+
+  function cleanup(callbackName) {
+    isFetching = false;
+    document.getElementById('submit-btn').disabled = false;
+    delete window[callbackName];
+    const scriptTag = document.getElementById(callbackName);
+    if (scriptTag) scriptTag.remove();
   }
 
   function renderBarcode(id) {
@@ -210,6 +229,6 @@
     errorDiv.innerText = msg;
     errorDiv.style.display = "block";
   }
-</script>
+  </script>
 </body>
 </html>
